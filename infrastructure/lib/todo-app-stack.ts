@@ -17,6 +17,14 @@ export class TodoAppStack extends cdk.Stack {
       pointInTimeRecovery: true,
     });
 
+    // Create DynamoDB table for partners
+    const partnersTable = new dynamodb.Table(this, 'PartnersTable', {
+      partitionKey: { name: 'partnerId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development only
+      pointInTimeRecovery: true,
+    });
+
     // Create Cognito User Pool for regular users
     const userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: 'todo-app-user-pool',
@@ -47,12 +55,13 @@ export class TodoAppStack extends cdk.Stack {
       userPool,
       userPoolClientName: 'todo-app-client',
       authFlows: {
-        userPassword: true,
-        userSrp: true,
+        userPassword: false,
+        userSrp: false,
       },
       oAuth: {
         flows: {
           implicitCodeGrant: true,
+          authorizationCodeGrant: true,
         },
         scopes: [
           cognito.OAuthScope.EMAIL,
@@ -61,6 +70,13 @@ export class TodoAppStack extends cdk.Stack {
         ],
         callbackUrls: ['http://localhost:3000'],
         logoutUrls: ['http://localhost:3000'],
+      },
+    });
+
+    // Create Cognito Domain for hosted UI
+    const domain = userPool.addDomain('CognitoDomain', {
+      cognitoDomain: {
+        domainPrefix: 'todo-app-auth',
       },
     });
 
@@ -94,17 +110,14 @@ export class TodoAppStack extends cdk.Stack {
       userPool: partnerUserPool,
       userPoolClientName: 'todo-app-partner-client',
       authFlows: {
-        userPassword: false,
-        userSrp: true,
+        userPassword: true,
+        userSrp: false,
       },
-      oAuth: {
-        flows: {
-          clientCredentials: true,
-        },
-        scopes: [
-          cognito.OAuthScope.OPENID,
-        ],
-      },
+      preventUserExistenceErrors: true,
+      refreshTokenValidity: cdk.Duration.days(30),
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      enableTokenRevocation: true,
     });
 
     // Create IAM role for the backend Lambda function
@@ -140,6 +153,14 @@ export class TodoAppStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'TodosTableName', {
       value: todosTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, 'CognitoDomain', {
+      value: domain.baseUrl(),
+    });
+
+    new cdk.CfnOutput(this, 'PartnersTableName', {
+      value: partnersTable.tableName,
     });
   }
 } 

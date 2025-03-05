@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { authRouter } from './routes/auth';
 import { todoRouter } from './routes/todos';
 import { partnerRouter } from './routes/partner';
 import { errorHandler } from './middleware/errorHandler';
@@ -17,7 +16,6 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', authRouter);
 app.use('/api/todos', authMiddleware, todoRouter);
 app.use('/api/partner', partnerRouter);
 
