@@ -17,13 +17,6 @@ export class TodoAppStack extends cdk.Stack {
       pointInTimeRecovery: true,
     });
 
-    // Create DynamoDB table for partners
-    const partnersTable = new dynamodb.Table(this, 'PartnersTable', {
-      partitionKey: { name: 'partnerId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development only
-      pointInTimeRecovery: true,
-    });
 
     // Create Cognito User Pool for regular users
     const userPool = new cognito.UserPool(this, 'UserPool', {
@@ -56,7 +49,8 @@ export class TodoAppStack extends cdk.Stack {
       userPoolClientName: 'todo-app-client',
       authFlows: {
         userPassword: false,
-        userSrp: false,
+        userSrp: true,
+        adminUserPassword: false,
       },
       oAuth: {
         flows: {
@@ -109,6 +103,7 @@ export class TodoAppStack extends cdk.Stack {
     const partnerUserPoolClient = new cognito.UserPoolClient(this, 'PartnerUserPoolClient', {
       userPool: partnerUserPool,
       userPoolClientName: 'todo-app-partner-client',
+      generateSecret: true,
       authFlows: {
         userPassword: true,
         userSrp: false,
@@ -151,6 +146,10 @@ export class TodoAppStack extends cdk.Stack {
       value: partnerUserPoolClient.userPoolClientId,
     });
 
+    new cdk.CfnOutput(this, 'PartnerUserPoolClientSecret', {
+      value: partnerUserPoolClient.userPoolClientSecret.toString(),
+    });
+
     new cdk.CfnOutput(this, 'TodosTableName', {
       value: todosTable.tableName,
     });
@@ -159,8 +158,5 @@ export class TodoAppStack extends cdk.Stack {
       value: domain.baseUrl(),
     });
 
-    new cdk.CfnOutput(this, 'PartnersTableName', {
-      value: partnersTable.tableName,
-    });
   }
 } 

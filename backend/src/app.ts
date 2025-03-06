@@ -1,12 +1,23 @@
+import dotenv from 'dotenv';
+// Load environment variables first
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { todoRouter } from './routes/todos';
 import { partnerRouter } from './routes/partner';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 
-dotenv.config();
+// Debug environment variables
+console.log('Environment Variables:', {
+  region: process.env.AWS_REGION,
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID ? '***' : undefined,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ? '***' : undefined,
+  tableName: process.env.TODOS_TABLE_NAME,
+  userPoolId: process.env.COGNITO_USER_POOL_ID,
+  clientId: process.env.COGNITO_CLIENT_ID
+});
 
 const app = express();
 const port = process.env.PORT || 3000;

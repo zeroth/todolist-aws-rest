@@ -6,23 +6,63 @@ import { AppError } from '../utils/AppError';
 import { Request, Response, NextFunction } from 'express';
 import * as crypto from 'crypto';
 
+// if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+//   throw new Error('AWS credentials or region not configured');
+// }
+
 const router = Router();
-const cognitoClient = new CognitoIdentityProviderClient({});
-const dynamoClient = new DynamoDBClient({});
+
+// Initialize Cognito client
+const cognitoClient = new CognitoIdentityProviderClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? ''
+  }
+});
+
+
+// Initialize DynamoDB client
+const dynamoClient = new DynamoDBClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? ''
+  }
+});
+
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
-const partnerUserPoolId = process.env.PARTNER_COGNITO_USER_POOL_ID;
-const partnerClientId = process.env.PARTNER_COGNITO_CLIENT_ID;
-const TABLE_NAME = process.env.TODOS_TABLE_NAME;
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+// // Debug logging
+// console.log('AWS Configuration:', {
+//   region: process.env.AWS_REGION,
+//   accessKeyId: process.env.AWS_ACCESS_KEY_ID ? '***' : undefined,
+//   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ? '***' : undefined,
+//   tableName: process.env.TODOS_TABLE_NAME,
+//   userPoolId: process.env.PARTNER_COGNITO_USER_POOL_ID,
+//   clientId: process.env.PARTNER_COGNITO_CLIENT_ID
+// });
+// Helper function to calculate SECRET_HASH
+function calculateSecretHash(username: string): string {
+  const clientId = process.env.PARTNER_COGNITO_CLIENT_ID ?? '';
+  const clientSecret = process.env.PARTNER_COGNITO_CLIENT_SECRET ?? '';
 
-if (!partnerUserPoolId || !partnerClientId || !TABLE_NAME || !ADMIN_API_KEY) {
-  throw new Error('Missing required configuration');
+  const message = username + clientId;
+  return crypto
+    .createHmac('SHA256', clientSecret)
+    .update(message)
+    .digest('base64');
 }
 
 // Admin middleware to protect partner registration
 const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'];
+  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+
+  if (!ADMIN_API_KEY) {
+    throw new AppError('Missing ADMIN_API_KEY configuration', 500);
+  }
+
   if (apiKey !== ADMIN_API_KEY) {
     throw new AppError('Unauthorized', 401);
   }
@@ -32,6 +72,12 @@ const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) =>
 // Get partner access token
 router.post('/auth/token', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const partnerClientId = process.env.PARTNER_COGNITO_CLIENT_ID;
+    if (!partnerClientId) {
+      throw new AppError('Missing PARTNER_COGNITO_CLIENT_ID configuration', 500);
+    }
+
+    // refresh token is optional and if not provided, it will be ignored  
     const { partnerId, partnerSecret, refreshToken } = req.body;
 
     // Handle refresh token flow
@@ -41,6 +87,7 @@ router.post('/auth/token', async (req: Request, res: Response, next: NextFunctio
         ClientId: partnerClientId,
         AuthParameters: {
           REFRESH_TOKEN: refreshToken,
+          SECRET_HASH: calculateSecretHash(partnerId),
         },
       });
 
@@ -71,6 +118,7 @@ router.post('/auth/token', async (req: Request, res: Response, next: NextFunctio
       AuthParameters: {
         USERNAME: partnerId,
         PASSWORD: partnerSecret,
+        SECRET_HASH: calculateSecretHash(partnerId),
       },
     });
 
@@ -96,6 +144,11 @@ router.post('/auth/token', async (req: Request, res: Response, next: NextFunctio
 // Create a todo on behalf of a partner
 router.post('/todos', async (req, res, next) => {
   try {
+    const TABLE_NAME = process.env.TODOS_TABLE_NAME;
+    if (!TABLE_NAME) {
+      throw new AppError('Missing TODOS_TABLE_NAME configuration', 500);
+    }
+
     const { userId, title, description, dueDate } = req.body;
 
     if (!userId || !title) {
@@ -140,6 +193,11 @@ router.post('/todos', async (req, res, next) => {
 // Register new partner
 router.post('/register', adminAuthMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const partnerUserPoolId = process.env.PARTNER_COGNITO_USER_POOL_ID;
+    if (!partnerUserPoolId) {
+      throw new AppError('Missing PARTNER_COGNITO_USER_POOL_ID configuration', 500);
+    }
+
     const { partnerId, email } = req.body;
 
     if (!partnerId || !email) {
@@ -165,7 +223,7 @@ router.post('/register', adminAuthMiddleware, async (req: Request, res: Response
           Value: email,
         },
         {
-          Name: 'custom:partnerId',
+          Name: 'preferred_username',
           Value: partnerId,
         }
       ],

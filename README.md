@@ -64,6 +64,36 @@ A full-stack todo list application with user authentication and partner API inte
    npm start
    ```
 
+## AWS Infrastructure Deployment
+
+1. Bootstrap AWS CDK (if not already done):
+   ```bash
+   cd infrastructure
+   cdk bootstrap
+   ```
+
+2. Deploy the infrastructure:
+   ```bash
+   # Review the changes that will be deployed
+   cdk diff
+
+   # Deploy the infrastructure
+   cdk deploy
+   ```
+
+3. After deployment, note down the following outputs:
+   - Cognito User Pool ID
+   - Cognito App Client ID
+   - API Gateway URL
+   - Other resource ARNs and endpoints
+
+4. Update the environment variables in both frontend and backend applications with the deployed resource information.
+
+5. To destroy the infrastructure (if needed):
+   ```bash
+   cdk destroy
+   ```
+
 ## API Documentation
 
 ### User Endpoints

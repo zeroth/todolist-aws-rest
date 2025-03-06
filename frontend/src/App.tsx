@@ -25,7 +25,7 @@ function App() {
         {({ signOut, user }) => (
           <div className="App">
             <header className="App-header">
-              <h1>Welcome {user?.username}</h1>
+              <h1>Welcome {user?.signInDetails?.loginId}</h1>
               <button onClick={signOut}>Sign Out</button>
             </header>
             <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>

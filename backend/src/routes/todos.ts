@@ -3,18 +3,39 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { AppError } from '../utils/AppError';
 
-const router = Router();
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+// if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
+//   throw new Error('AWS credentials or region not configured');
+// }
 
-const TABLE_NAME = process.env.TODOS_TABLE_NAME;
-if (!TABLE_NAME) {
-  throw new Error('Missing TODOS_TABLE_NAME environment variable');
-}
+const router = Router();
+
+// Initialize DynamoDB client
+const dynamoClient = new DynamoDBClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? ''
+  }
+});
+
+const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 // Get all todos for the authenticated user
 router.get('/', async (req, res, next) => {
   try {
+    // Debug logging
+    // console.log('AWS Configuration:', {
+    //   region: process.env.AWS_REGION,
+    //   accessKeyId: process.env.AWS_ACCESS_KEY_ID ? '***' : undefined,
+    //   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ? '***' : undefined,
+    //   tableName: process.env.TODOS_TABLE_NAME
+    // });
+
+    const TABLE_NAME = process.env.TODOS_TABLE_NAME;
+    if (!TABLE_NAME) {
+      throw new AppError('Missing TODOS_TABLE_NAME environment variable', 500);
+    }
+
     const userId = req.user?.sub;
     if (!userId) {
       throw new AppError('User not authenticated', 401);
@@ -29,10 +50,10 @@ router.get('/', async (req, res, next) => {
     });
 
     const result = await docClient.send(queryCommand);
-
+    console.log('todolist result', result);
     res.json({
       status: 'success',
-      data: result.Items,
+      data: result.Items || [],
     });
   } catch (error) {
     next(error);
@@ -42,6 +63,11 @@ router.get('/', async (req, res, next) => {
 // Create a new todo
 router.post('/', async (req, res, next) => {
   try {
+    const TABLE_NAME = process.env.TODOS_TABLE_NAME;
+    if (!TABLE_NAME) {
+      throw new AppError('Missing TODOS_TABLE_NAME environment variable', 500);
+    }
+
     const userId = req.user?.sub;
     if (!userId) {
       throw new AppError('User not authenticated', 401);
@@ -85,6 +111,11 @@ router.post('/', async (req, res, next) => {
 // Update a todo
 router.put('/:todoId', async (req, res, next) => {
   try {
+    const TABLE_NAME = process.env.TODOS_TABLE_NAME;
+    if (!TABLE_NAME) {
+      throw new AppError('Missing TODOS_TABLE_NAME environment variable', 500);
+    }
+
     const userId = req.user?.sub;
     if (!userId) {
       throw new AppError('User not authenticated', 401);
@@ -131,6 +162,11 @@ router.put('/:todoId', async (req, res, next) => {
 // Delete a todo
 router.delete('/:todoId', async (req, res, next) => {
   try {
+    const TABLE_NAME = process.env.TODOS_TABLE_NAME;
+    if (!TABLE_NAME) {
+      throw new AppError('Missing TODOS_TABLE_NAME environment variable', 500);
+    }
+
     const userId = req.user?.sub;
     if (!userId) {
       throw new AppError('User not authenticated', 401);
